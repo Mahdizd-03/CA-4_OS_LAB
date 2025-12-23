@@ -6,12 +6,15 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "rwlock.h"
+#define TEST_SLEEPLOCK 0
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
 
+struct rwlock testlock;
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -120,9 +123,13 @@ found:
 void
 userinit(void)
 {
+  #if TEST_SLEEPLOCK
+    test_sleeplock_owner();
+  #endif
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
-
+  //test
+  rwlock_init(&testlock, "testlock");
   p = allocproc();
   
   initproc = p;
@@ -172,6 +179,25 @@ growproc(int n)
   curproc->sz = sz;
   switchuvm(curproc);
   return 0;
+}
+
+//test for rwlock
+void
+rwlock_test(int id, int is_writer)
+{
+  if(is_writer){
+    rwlock_acquire_write(&testlock);
+    cprintf("WRITER %d entered\n", id);
+    for(volatile int i = 0; i < 100000000; i++);
+    cprintf("WRITER %d leaving\n", id);
+    rwlock_release_write(&testlock);
+  } else {
+    rwlock_acquire_read(&testlock);
+    cprintf("READER %d entered\n", id);
+    for(volatile int i = 0; i < 100000000; i++);
+    cprintf("READER %d leaving\n", id);
+    rwlock_release_read(&testlock);
+  }
 }
 
 // Create a new process copying p as the parent.
@@ -532,3 +558,4 @@ procdump(void)
     cprintf("\n");
   }
 }
+

@@ -5,13 +5,31 @@
 #include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
+#include "spinlock.h"
 #include "proc.h"
+#include "rwlock.h"
 
+extern uint ticks;
+extern struct spinlock tickslock;
+extern void rwlock_test(int, int);
+//sys_fork has changed due to testing rwlock. original is commented
 int
 sys_fork(void)
 {
   return fork();
 }
+//int
+//sys_fork(void)
+//{
+//  int pid = fork();
+
+//  if(pid == 0){
+//    struct proc *p = myproc();
+//    rwlock_test(p->pid, p->pid % 4 == 0);
+//  }
+
+//  return pid;
+//}
 
 int
 sys_exit(void)
@@ -89,3 +107,45 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+extern struct rwlock testlock;
+
+int
+sys_rwtest(void)
+{
+  int is_writer;
+
+  if(argint(0, &is_writer) < 0)
+    return -1;
+
+  if(is_writer){
+    rwlock_acquire_write(&testlock);
+    cprintf("WRITER %d entered\n", myproc()->pid);
+
+    acquire(&tickslock);
+    uint start = ticks;
+    while(ticks - start < 100){
+      sleep(&ticks, &tickslock);
+    }
+    release(&tickslock);
+
+    cprintf("WRITER %d leaving\n", myproc()->pid);
+    rwlock_release_write(&testlock);
+  } else {
+    rwlock_acquire_read(&testlock);
+    cprintf("READER %d entered\n", myproc()->pid);
+
+    acquire(&tickslock);
+    uint start = ticks;
+    while(ticks - start < 100){
+      sleep(&ticks, &tickslock);
+    }
+    release(&tickslock);
+
+    cprintf("READER %d leaving\n", myproc()->pid);
+    rwlock_release_read(&testlock);
+  }
+
+  return 0;
+}
+
