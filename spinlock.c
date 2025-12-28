@@ -12,9 +12,18 @@
 void
 initlock(struct spinlock *lk, char *name)
 {
-  lk->name = name;
   lk->locked = 0;
+  lk->name = name;
   lk->cpu = 0;
+  // per-CPU stats to 0
+  int i;
+//  for(i = 0; i < 10; i++)
+//    lk->pcs[i] = 0;
+    
+  for(i = 0; i < NCPU; i++){
+    lk->acq_count[i] = 0;
+    lk->total_spins[i] = 0;
+  }
 }
 
 // Acquire the lock.
@@ -28,17 +37,34 @@ acquire(struct spinlock *lk)
   if(holding(lk))
     panic("acquire");
 
+  // local spin counter
+  uint64 local_spins = 0;
+  
   // The xchg is atomic.
-  while(xchg(&lk->locked, 1) != 0)
-    ;
+  while(xchg(&lk->locked, 1) != 0){ //busy wait loop
+    // failed, increment
+    local_spins++;
+    // can be uncommented to remove presure from the Xv6 pipline
+    //asm("pause");
+  }
 
-  // Tell the C compiler and the processor to not move loads or stores
+  lk->cpu = mycpu();
+    // Tell the C compiler and the processor to not move loads or stores
   // past this point, to ensure that the critical section's memory
   // references happen after the lock is acquired.
   __sync_synchronize();
 
+
+  // lock acquired, save cpu stats
+  int cid = cpuid();
+
+  // update per-cpu counters 
+  lk->acq_count[cid] += 1;
+  lk->total_spins[cid] += local_spins;
+
+
   // Record info about lock acquisition for debugging.
-  lk->cpu = mycpu();
+  
   getcallerpcs(&lk, lk->pcs);
 }
 

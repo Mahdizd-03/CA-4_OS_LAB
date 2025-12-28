@@ -5,6 +5,8 @@
 #include "mmu.h"
 #include "proc.h"
 #include "x86.h"
+#include "plock.h"
+
 
 static void startothers(void);
 static void mpmain(void)  __attribute__((noreturn));
@@ -27,6 +29,7 @@ main(void)
   consoleinit();   // console hardware
   uartinit();      // serial port
   pinit();         // process table
+  plock_init(&global_plock);      //plock_shit here
   tvinit();        // trap vectors
   binit();         // buffer cache
   fileinit();      // file table
@@ -75,7 +78,7 @@ startothers(void)
   memmove(code, _binary_entryother_start, (uint)_binary_entryother_size);
 
   for(c = cpus; c < cpus+ncpu; c++){
-    if(c == mycpu())  // We've started already.
+    if(c->apicid == lapicid())  // We've started already.
       continue;
 
     // Tell entryother.S what stack to use, where to enter, and what

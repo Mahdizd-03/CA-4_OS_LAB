@@ -24,6 +24,9 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int rwtest(int is_writer);
+int getlockstat(uint64, int);
+int plock_acquire(int priority);
+int plock_release(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

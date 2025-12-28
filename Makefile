@@ -28,6 +28,7 @@ OBJS = \
 	vectors.o\
 	vm.o\
 	rwlock.o\
+	plock.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf
@@ -109,11 +110,13 @@ bootblock: bootasm.S bootmain.c
 	$(OBJCOPY) -S -O binary -j .text bootblock.o bootblock
 	./sign.pl bootblock
 
-entryother: entryother.S
-	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c entryother.S
-	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7000 -o bootblockother.o entryother.o
-	$(OBJCOPY) -S -O binary -j .text bootblockother.o entryother
-	$(OBJDUMP) -S bootblockother.o > entryother.asm
+entryother: entryother.o
+	$(LD) -m elf_i386 -N -e start -Ttext 0x7000 -o entryother.out entryother.o
+	$(OBJCOPY) -S -O binary entryother.out entryother
+	$(OBJDUMP) -S entryother.out > entryother.asm
+
+entryother.o: entryother.S
+	$(CC) -m32 -fno-pic -nostdinc -I. -c entryother.S
 
 initcode: initcode.S
 	$(CC) $(CFLAGS) -nostdinc -I. -c initcode.S
@@ -183,6 +186,8 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_rwtest\
+	_lockstat_test\
+	_plock_test\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -219,9 +224,15 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 2
+CPUS ?= 4
 endif
-QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
+QEMUOPTS = -machine pc-i440fx-2.9 \
+           -no-acpi \
+           -no-hpet \
+           -drive file=fs.img,index=1,media=disk,format=raw \
+           -drive file=xv6.img,index=0,media=disk,format=raw \
+           -smp $(CPUS) \
+           -m 512
 
 qemu: fs.img xv6.img
 	$(QEMU) -serial mon:stdio $(QEMUOPTS)

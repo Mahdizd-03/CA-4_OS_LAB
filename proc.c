@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "spinlock.h"
 #include "rwlock.h"
+
 #define TEST_SLEEPLOCK 0
 
 struct {
@@ -22,6 +23,7 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
 
 void
 pinit(void)

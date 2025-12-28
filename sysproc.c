@@ -8,6 +8,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "rwlock.h"
+#include "plock.h"
 
 extern uint ticks;
 extern struct spinlock tickslock;
@@ -108,8 +109,9 @@ sys_uptime(void)
   return xticks;
 }
 
-extern struct rwlock testlock;
 
+extern struct rwlock testlock;
+// test
 int
 sys_rwtest(void)
 {
@@ -146,6 +148,59 @@ sys_rwtest(void)
     rwlock_release_read(&testlock);
   }
 
+  return 0;
+}
+
+// func
+int
+sys_getlockstat(void)
+{
+  uint user_addr;
+  if(argint(0, (int *)&user_addr) < 0)
+    return -1;
+
+  extern struct spinlock tickslock;
+  struct spinlock *lk = &tickslock;
+
+  uint64 scores[NCPU];
+  int i;
+
+  for(i = 0; i < NCPU; i++){
+    uint a = (uint)lk->acq_count[i];
+    uint s = (uint)lk->total_spins[i];
+
+
+ //   cprintf("cpu %d: acq=%d spins=%d\n", i, a, s);
+
+    if(a == 0)
+      scores[i] = 0;
+    else
+      scores[i] = (s * 1000) / a;   // avg spins per acquire 
+  }
+
+  if(copyout(myproc()->pgdir,
+             user_addr,
+             (char *)scores,
+             sizeof(scores)) < 0)
+    return -1;
+
+  return 0;
+}
+
+int
+sys_plock_acquire(void)
+{
+  int priority;
+  if (argint(0, &priority) < 0)
+    return -1;
+  plock_acquire(&global_plock, priority);
+  return 0;
+}
+
+int
+sys_plock_release(void)
+{
+  plock_release(&global_plock);
   return 0;
 }
 
